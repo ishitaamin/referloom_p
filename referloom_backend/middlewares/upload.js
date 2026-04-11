@@ -1,32 +1,32 @@
-// src/middlewares/upload.js
+// referloom_backend/middlewares/upload.js
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { v2 as cloudinary } from "cloudinary";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import dotenv from "dotenv";
 
-const uploadsDir = path.join(process.cwd(), "uploads");
+dotenv.config();
 
-// ensure uploads folder exists
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir);
-}
+// 1. Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || ".jpg";
-    const name = `${file.fieldname}_${Date.now()}${ext}`;
-    cb(null, name);
+// 2. Configure Storage Engine
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "referloom", // Folder name in your Cloudinary dashboard
+    allowed_formats: ["jpeg", "jpg", "png", "pdf"],
+    resource_type: "auto", // Crucial for allowing PDFs to upload alongside images
   },
 });
 
-const fileFilter = (req, file, cb) => {
-  // accept images & pdfs
-  const allowed = /jpeg|jpg|png|pdf/;
-  const ext = path.extname(file.originalname).toLowerCase();
-  if (allowed.test(ext)) cb(null, true);
-  else cb(new Error("Only images and PDFs are allowed"));
-};
-
-const upload = multer({ storage, fileFilter, limits: { fileSize: 5 * 1024 * 1024 } }); // 5MB limit
+// 3. Create Multer Instance
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
 
 export default upload;

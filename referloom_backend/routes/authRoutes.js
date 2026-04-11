@@ -7,8 +7,8 @@ const router = express.Router();
 router.post(
   "/register",
   upload.fields([
-    { name: "degreeProof", maxCount: 1 },
-    { name: "idProof", maxCount: 1 },
+    { name: "degreeProof", maxCount: 1 }, // For Alumni
+    { name: "idProof", maxCount: 1 }      // For Company
   ]),
   register
 );

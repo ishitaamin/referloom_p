@@ -1,13 +1,19 @@
-// src/models/Otp.js
 import mongoose from "mongoose";
 
 const otpSchema = new mongoose.Schema({
-  phone: { type: String, required: true, index: true },
-  otp: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now, index: true },
-  expiresAt: { type: Date, required: true, index: true },
+  email: { 
+    type: String, 
+    required: true 
+  },
+  otp: { 
+    type: String, 
+    required: true 
+  },
+  createdAt: { 
+    type: Date, 
+    default: Date.now, 
+    expires: 300 // Automatically deletes the document after 5 minutes (300 seconds)
+  }
 });
-
-otpSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // optional if using TTL index
 
 export default mongoose.model("Otp", otpSchema);
