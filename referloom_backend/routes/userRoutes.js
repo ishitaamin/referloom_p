@@ -4,24 +4,28 @@ import {
   getMyProfile, 
   getUserById, 
   updateVisibility, 
-  grantAccess,
-  revokeAccess,
-  updateProfile // ✅ Imported the new controller
+  updateProfile,
+  updateCareerPreferences,
+  getAllAlumni,
+  resetCareerGoals // ✅ Imported the missing controller
 } from "../controllers/userController.js";
 import { protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
-// All routes here are protected (must be logged in)
 router.use(protect);
 
 router.get("/profile", getMyProfile);
-router.put("/profile", updateProfile); // ✅ Added the PUT route for editing profile/skills
+router.put("/profile", updateProfile); 
 router.put("/visibility", updateVisibility);
-router.post("/grant-access", grantAccess);
-router.post("/revoke-access", revokeAccess);
+router.post("/career-preferences", updateCareerPreferences);
+// userRoutes.js
+router.post("/reset-career-goals", protect, resetCareerGoals);
 
-// This must go last so it doesn't accidentally catch 'profile' or 'visibility' as an ID
+// ✅ Added the missing alumni route
+router.get("/alumni", getAllAlumni);
+
+// Note: /:id must always be at the bottom, otherwise "/alumni" is treated as an ID!
 router.get("/:id", getUserById); 
 
 export default router;

@@ -1,104 +1,62 @@
-// referloom_frontend/src/context/AuthContext.tsx
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
+// referloom_fixed/src/context/AuthContext.js
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import api from '../services/api';
 
-const AuthContext = createContext();
+const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-  const [pendingUser, setPendingUser] = useState(null);
   
+  // Temporary storage for user details between the Register screen and the OTP screen
+  const [pendingUser, setPendingUser] = useState(null); 
+  
+  const router = useRouter();
 
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const token = await SecureStore.getItemAsync('userToken');
-        if (token) {
-          const { data } = await api.get('/users/profile');
-          setUser(data);
-        }
-      } catch (error) {
-        await SecureStore.deleteItemAsync('userToken');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    loadUser();
+    checkAuthStatus();
   }, []);
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        const response = await api.get('/users/profile');
+        setUser(response.data);
+      }
+    } catch (error) {
+      console.log("Token expired or invalid", error);
+      await AsyncStorage.removeItem('userToken');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (email, password) => {
     try {
-      console.log("\n==================================");
-      console.log("🚦 1. INITIATING LOGIN REQUEST");
-      console.log("📍 Target URL:", api.defaults.baseURL + '/auth/login');
-      console.log("📦 Payload:", { email, password });
-
       const response = await api.post('/auth/login', { email, password });
-
-      console.log("✅ 2. LOGIN SUCCESS FROM SERVER!");
-      console.log("==================================\n");
-      
       const { token, user: userData } = response.data;
-      await SecureStore.setItemAsync('userToken', token);
+      
+      // FIX: Save both token and user object uniformly
+      await AsyncStorage.setItem('userToken', token);
+      await AsyncStorage.setItem('userData', JSON.stringify(userData)); 
+      
       setUser(userData);
-      router.replace('/'); 
+      routeUserByRole(userData.role);
     } catch (error) {
-      console.log("❌ 2. LOGIN FAILED AT NETWORK LEVEL!");
-      
-      if (error.response) {
-        console.log("🛑 Server Reached, but rejected us:", error.response.data);
-      } else if (error.request) {
-        console.log("🚧 Server NEVER Reached. Axios error:", error.message);
-      } else {
-        console.log("⚠️ Unknown Error:", error.message);
-      }
-      console.log("==================================\n");
-      
-      // Throwing the RAW error instead of a string
-      throw error; 
+      throw error.response?.data?.message || "Login failed. Please check your network.";
     }
   };
 
-  const register = async (formData) => {
-    try {
-      const formDataToSend = new FormData();
-      Object.keys(rawFormData).forEach(key => {
-        formDataToSend.append(key, rawFormData[key]);
-      });
+  // --- NEW REGISTRATION & OTP METHODS ---
 
-      const response = await api.post('/auth/register', formDataToSend, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      // ...
-      // After successful registration, trigger OTP send automatically
-      const email = formData._parts.find(part => part[0] === 'email')[1];
-      await sendOtp(email);
-      
-      return response.data;
-    } catch (error) {
-      throw error.response?.data?.message || 'Registration failed';
-    }
-  };
-
-  // Inside AuthContext.tsx
-  const initiateRegistration = async (rawFormData, email) => {
-    try {
-      await sendOtp(email); 
-      setPendingUser(rawFormData); // Store raw JSON object here, not FormData
-    } catch (error) {
-      throw error;
-    }
-  };
   const sendOtp = async (email) => {
     try {
-      // FIX: Changed from '/otp/send-otp' to '/otp/send' to match backend routes
       await api.post('/otp/send', { email });
     } catch (error) {
-      throw error.response?.data?.message || 'Failed to send OTP';
+      throw error.response?.data?.message || "Failed to send OTP.";
     }
   };
 
@@ -106,23 +64,99 @@ export const AuthProvider = ({ children }) => {
     try {
       await api.post('/otp/verify-otp', { email, otp });
     } catch (error) {
-      throw error.response?.data?.message || "OTP verification failed";
+      throw error.response?.data?.message || "Invalid OTP.";
     }
   };
 
-  
+  const registerUser = async (userData) => {
+    try {
+      const payload = {
+        ...userData,
+        fullName: `${userData.firstName} ${userData.lastName}`
+      };
+      
+      const response = await api.post('/auth/register', payload);
+      const { token, user: newUser } = response.data;
+      
+      // FIX: Save both token and user object uniformly
+      await AsyncStorage.setItem('userToken', token);
+      await AsyncStorage.setItem('userData', JSON.stringify(newUser));
+      
+      setUser(newUser);
+      setPendingUser(null);
+      routeUserByRole(newUser.role);
+    } catch (error) {
+      throw error.response?.data?.message || "Registration failed.";
+    }
+  };
 
+  const loadUser = async () => {
+    try {
+      // FIX: Use the exact same keys as the login function
+      const storedToken = await AsyncStorage.getItem('userToken'); 
+      const storedUser = await AsyncStorage.getItem('userData');
+  
+      if (storedToken && storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+  
+        try {
+          const targetId = parsedUser._id || parsedUser.id;
+          const freshResponse = await api.get(`/users/${targetId}`);
+          const freshUser = freshResponse.data;
+  
+          setUser(freshUser);
+          await AsyncStorage.setItem('userData', JSON.stringify(freshUser)); // FIX: updated key here too
+        } catch (fetchErr) {
+          console.log("Could not sync fresh user data from DB", fetchErr.message);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading auth state:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // ---------------------------------------
+  const refreshUser = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (token) {
+        // Fetch fresh data from your database
+        const response = await api.get('/users/profile');
+        const freshUser = response.data;
+        
+        // Update state and storage instantly
+        setUser(freshUser);
+        await AsyncStorage.setItem('userData', JSON.stringify(freshUser));
+      }
+    } catch (error) {
+      console.log("Failed to refresh user data:", error);
+    }
+  };
   const logout = async () => {
-    await SecureStore.deleteItemAsync('userToken');
+    await AsyncStorage.removeItem('userToken');
+    await AsyncStorage.removeItem('userData');
     setUser(null);
     router.replace('/(auth)/LoginScreen');
   };
 
+  const routeUserByRole = (role) => {
+    if (role === 'student') router.replace('/(roles)/student');
+    else if (role === 'company') router.replace('/(roles)/company');
+    else if (role === 'alumni') router.replace('/(roles)/alumni');
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, sendOtp, verifyOtp, logout }}>
+    <AuthContext.Provider value={{ 
+      user, isLoading, login, logout, setUser, routeUserByRole,
+      pendingUser, setPendingUser, sendOtp, verifyOtp, registerUser ,refreshUser
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+
 
 export const useAuth = () => useContext(AuthContext);

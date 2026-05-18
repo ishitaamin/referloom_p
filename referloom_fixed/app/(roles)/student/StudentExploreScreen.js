@@ -1,7 +1,6 @@
-// referloom_frontend/app/(roles)/student/StudentExploreScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../../src/theme/colors';
 import api from '../../../src/services/api';
@@ -19,8 +18,8 @@ export default function StudentExploreScreen() {
 
   const fetchAlumni = async () => {
     try {
-      // Assuming backend has a route to fetch all public alumni
-      const response = await api.get('/users?role=alumni'); 
+      // ✅ Now this endpoint actually exists on the backend!
+      const response = await api.get('/users/alumni'); 
       setAlumni(response.data || []);
     } catch (error) {
       console.error("Failed to fetch alumni", error);
@@ -31,95 +30,99 @@ export default function StudentExploreScreen() {
 
   const filteredAlumni = alumni.filter(a => 
     a.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.alumni?.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.alumni?.role?.toLowerCase().includes(searchQuery.toLowerCase())
+    a.alumniDetails?.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    a.alumniDetails?.role?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderAlumniCard = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{item.fullName?.charAt(0)}</Text>
-        </View>
-        <View style={styles.info}>
-          <Text style={styles.name}>{item.fullName}</Text>
-          <Text style={styles.role}>{item.alumni?.role} @ {item.alumni?.company}</Text>
-          <Text style={styles.gradYear}>Class of {item.alumni?.graduationYear}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.skillsRow}>
-        {item.skills?.slice(0, 3).map((skill, idx) => (
-          <View key={idx} style={styles.skillBadge}>
-            <Text style={styles.skillText}>{skill}</Text>
+  const renderAlumniCard = ({ item }) => {
+    const role = item.alumniDetails?.role || 'Professional';
+    const company = item.alumniDetails?.company || 'Verified Alumni';
+    const gradYear = item.alumniDetails?.graduationYear || 'N/A';
+    
+    // Safety check in case skills is undefined
+    const skills = item.alumniDetails?.skills || [];
+
+    return (
+      <TouchableOpacity 
+        style={styles.card}
+        onPress={() => router.push({
+          pathname: '/(roles)/student/MentorshipRequestScreen',
+          params: { 
+            alumniId: item._id, 
+            alumniName: item.fullName,
+            company: company
+          }
+        })}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.avatar}>
+            {item.profileImage ? (
+              <Image source={{ uri: item.profileImage }} style={{ width: 50, height: 50, borderRadius: 25 }} />
+            ) : (
+              <Text style={styles.avatarText}>{item.fullName?.charAt(0)}</Text>
+            )}
           </View>
-        ))}
-      </View>
-
-      {/* Route to the Request screen passing the specific Alumni ID */}
-      // Inside your render function for Alumni in StudentExploreScreen.js
-<TouchableOpacity 
-  style={styles.alumniCard}
-  onPress={() => router.push({
-    pathname: '/(roles)/student/MentorshipRequestScreen',
-    params: { 
-      alumniId: item._id, 
-      alumniName: item.fullName,
-      company: item.professionalDetails?.companyName || 'Verified Alumni'
-    }
-  })}
->
-  <View style={styles.alumniInfo}>
-    <Text style={styles.alumniName}>{item.fullName}</Text>
-    <Text style={styles.alumniDesignation}>
-      {item.professionalDetails?.designation} at {item.professionalDetails?.companyName}
-    </Text>
-  </View>
-  <Feather name="chevron-right" size={20} color={COLORS.primary} />
-</TouchableOpacity>
-    </View>
-  );
-
+          <View style={styles.info}>
+            <Text style={styles.name}>{item.fullName}</Text>
+            <Text style={styles.role}>{role} @ {company}</Text>
+            <Text style={styles.gradYear}>Class of {gradYear}</Text>
+          </View>
+          <Feather name="chevron-right" size={20} color={COLORS.primary} />
+        </View>
+        
+        {skills.length > 0 && (
+          <View style={styles.skillsRow}>
+            {skills.slice(0, 3).map((skill, idx) => (
+              <View key={idx} style={styles.skillBadge}>
+                <Text style={styles.skillText}>{skill}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+  
   return (
     <ScreenWrapper>
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={24} color={COLORS.text?.primary || '#1A1A1A'} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Alumni Directory</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <View style={styles.searchContainer}>
-        <Feather name="search" size={20} color={COLORS.text?.secondary || '#666'} />
-        <TextInput 
-          style={styles.searchInput}
-          placeholder="Search by name, role, or company..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Feather name="arrow-left" size={24} color={COLORS.text?.primary || '#1A1A1A'} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Alumni Directory</Text>
+          <View style={{ width: 24 }} />
         </View>
-      ) : (
-        <FlatList 
-          data={filteredAlumni}
-          keyExtractor={(item) => item._id}
-          renderItem={renderAlumniCard}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No alumni found matching your search.</Text>
-            </View>
-          }
-        />
-      )}
-    </View>
+
+        <View style={styles.searchContainer}>
+          <Feather name="search" size={20} color={COLORS.text?.secondary || '#666'} />
+          <TextInput 
+            style={styles.searchInput}
+            placeholder="Search by name, role, or company..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        {loading ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+          </View>
+        ) : (
+          <FlatList 
+            data={filteredAlumni}
+            keyExtractor={(item) => item._id}
+            renderItem={renderAlumniCard}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No alumni found matching your search.</Text>
+              </View>
+            }
+          />
+        )}
+      </View>
     </ScreenWrapper>
   );
 }
@@ -143,8 +146,6 @@ const styles = StyleSheet.create({
   skillsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 },
   skillBadge: { backgroundColor: '#F0F4F8', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginRight: 8, marginBottom: 8 },
   skillText: { fontSize: 12, color: '#334E68', fontWeight: '500' },
-  requestBtn: { flexDirection: 'row', backgroundColor: COLORS.primary || '#007AFF', paddingVertical: 12, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  requestBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyState: { alignItems: 'center', marginTop: 40 },
   emptyText: { color: COLORS.text?.secondary || '#888' }

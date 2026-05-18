@@ -1,32 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import {
+  View, Text, StyleSheet, TextInput,
+  ScrollView, TouchableOpacity,
+  ActivityIndicator, Alert
+} from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS } from '../../../src/theme/colors';
 import PrimaryButton from '../../../src/components/ui/PrimaryButton';
 import api from '../../../src/services/api';
 import ScreenWrapper from '../../../src/components/ui/ScreenWrapper';
+import { useAuth } from '../../../src/context/AuthContext';
 
 export default function MentorshipRequestScreen() {
   const router = useRouter();
-  const { alumniId, alumniName, company } = useLocalSearchParams(); 
-  
-  const isComposeMode = !!alumniId; 
+  const { alumniId, alumniName, company } = useLocalSearchParams();
+  const { user } = useAuth(); // ✅ FIX: Added useAuth
+
+  const isComposeMode = !!alumniId;
+
   const [activeTab, setActiveTab] = useState('pending');
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(!isComposeMode);
-  
-  const [reason, setReason] = useState(''); 
+
+  const [reason, setReason] = useState('');
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
 
   const mentorshipReasons = [
-    "Resume Reviewing",
+    "Resume Review",
     "Mock Interview",
     "Career Guidance",
-    "Technical Skill Growth",
-    "Referral Inquiry"
+    "Skill Growth",
+    "Referral Help"
   ];
+
+  // ✅ FIX: Safety check for logout
+  if (!user) return null;
 
   useEffect(() => {
     if (!isComposeMode) fetchRequests();
@@ -34,188 +44,324 @@ export default function MentorshipRequestScreen() {
 
   const fetchRequests = async () => {
     try {
-      const response = await api.get('/mentorship/requests'); 
-      if (Array.isArray(response.data)) {
-        setRequests(response.data);
-      } else {
-        setRequests([]);
-      }
-    } catch (error) {
-      console.error("Failed to fetch requests", error);
-      setRequests([]); 
+      const res = await api.get('/mentorship/requests');
+      setRequests(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      setRequests([]);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSendRequest = async () => {
-    if (!reason) return Alert.alert("Required", "Please select a reason for mentorship.");
-    if (!message.trim()) return Alert.alert("Required", "Please write a short message.");
+    if (!reason) return Alert.alert("Select reason");
+    if (!message.trim()) return Alert.alert("Write message");
 
     setSending(true);
     try {
       await api.post('/mentorship/request', {
         alumniId,
-        message: `[${reason}] ${message}` 
+        message: `[${reason}] ${message}`
       });
-      Alert.alert("Success", "Request sent! Track status in the Mentorship Hub.");
+
+      Alert.alert("Sent 🚀", "Mentorship request sent!");
       router.replace('/(roles)/student/MentorshipRequestScreen');
-    } catch (error) {
-      Alert.alert("Error", error.response?.data?.message || "Failed to send request");
+
+    } catch (e) {
+      Alert.alert("Error", "Failed to send");
     } finally {
       setSending(false);
     }
   };
 
+  /* ================= COMPOSE SCREEN ================= */
+
   if (isComposeMode) {
     return (
       <ScreenWrapper>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Feather name="x" size={24} color={COLORS.text?.primary || '#1A1A1A'} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Request Mentorship</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <View style={styles.container}>
 
-        <ScrollView style={styles.content}>
-          <View style={styles.targetCard}>
-            <Text style={styles.targetTitle}>ALUMNI MENTOR</Text>
-            <Text style={styles.targetName}>{alumniName}</Text>
-            <Text style={styles.targetCompany}>{company}</Text>
+          {/* HEADER */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Feather name="x" size={24} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Request Mentor</Text>
+            <View style={{ width: 24 }} />
           </View>
 
-          <Text style={styles.label}>Primary Reason *</Text>
-          <View style={styles.reasonsGrid}>
-            {mentorshipReasons.map((item) => (
-              <TouchableOpacity 
-                key={item} 
-                style={[styles.reasonChip, reason === item && styles.activeChip]}
-                onPress={() => setReason(item)}
-              >
-                <Text style={[styles.reasonText, reason === item && styles.activeChipText]}>{item}</Text>
-              </TouchableOpacity>
-            ))}
+          <ScrollView style={styles.content}>
+
+            {/* TARGET */}
+            <View style={styles.targetCard}>
+              <Text style={styles.targetLabel}>MENTOR</Text>
+              <Text style={styles.targetName}>{alumniName}</Text>
+              <Text style={styles.targetCompany}>{company}</Text>
+            </View>
+
+            {/* REASON */}
+            <Text style={styles.label}>Why do you need help?</Text>
+            <View style={styles.reasonWrap}>
+              {mentorshipReasons.map(item => (
+                <TouchableOpacity
+                  key={item}
+                  style={[styles.reasonChip, reason === item && styles.reasonActive]}
+                  onPress={() => setReason(item)}
+                >
+                  <Text style={[styles.reasonText, reason === item && styles.reasonTextActive]}>
+                    {item}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* MESSAGE */}
+            <Text style={styles.label}>Message</Text>
+            <TextInput
+              style={styles.textArea}
+              placeholder="Write a short message..."
+              multiline
+              value={message}
+              onChangeText={setMessage}
+            />
+
+          </ScrollView>
+
+          {/* FOOTER */}
+          <View style={styles.footer}>
+            <PrimaryButton
+              title="Send Request"
+              onPress={handleSendRequest}
+              isLoading={sending}
+            />
           </View>
 
-          <Text style={styles.label}>Message for Alumni *</Text>
-          <TextInput 
-            style={styles.textArea}
-            placeholder="Share context (e.g., 'I am applying for Frontend roles and need a resume review...')"
-            multiline
-            numberOfLines={5}
-            value={message}
-            onChangeText={setMessage}
-          />
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <PrimaryButton title="Ask for Mentorship" onPress={handleSendRequest} isLoading={sending} />
         </View>
-      </View>
       </ScreenWrapper>
     );
   }
 
-  const filteredRequests = requests.filter(r => r.status === activeTab);
+  /* ================= HUB SCREEN ================= */
+
+  const filtered = requests.filter(r => r.status === activeTab);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={24} color={COLORS.text?.primary || '#1A1A1A'} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mentorship Hub</Text>
-        <TouchableOpacity onPress={() => router.push('/(roles)/student/StudentExploreScreen')}>
-          <Feather name="search" size={24} color={COLORS.primary || '#007AFF'} />
-        </TouchableOpacity>
-      </View>
+    <ScreenWrapper>
+      <View style={styles.container}>
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity style={[styles.tab, activeTab === 'pending' && styles.activeTab]} onPress={() => setActiveTab('pending')}>
-          <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>Pending</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tab, activeTab === 'accepted' && styles.activeTab]} onPress={() => setActiveTab('accepted')}>
-          <Text style={[styles.tabText, activeTab === 'accepted' && styles.activeTabText]}>My Mentors</Text>
-        </TouchableOpacity>
-      </View>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Feather name="arrow-left" size={24} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Mentorship Hub</Text>
+          <TouchableOpacity onPress={() => router.push('/(roles)/student/StudentExploreScreen')}>
+            <Feather name="search" size={22} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
-      ) : (
-        <ScrollView style={styles.listContent}>
-          {filteredRequests.length > 0 ? (
-            filteredRequests.map((req) => (
-              <View key={req._id} style={styles.requestCard}>
-                <View style={styles.reqHeader}>
-                  <Text style={styles.reqName}>{req.alumni?.fullName || "Unknown Alumni"}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: req.status === 'accepted' ? '#E8F5E9' : '#FFF3E0' }]}>
-                    <Text style={[styles.statusText, { color: req.status === 'accepted' ? '#4CAF50' : '#FF9800' }]}>
+        {/* CTA */}
+        <View style={styles.cta}>
+          <Text style={styles.ctaTitle}>Find a Mentor 🚀</Text>
+          <Text style={styles.ctaSub}>Connect with alumni & HR</Text>
+
+          <TouchableOpacity
+            style={styles.ctaBtn}
+            onPress={() => router.push('/(roles)/student/StudentExploreScreen')}
+          >
+            <Text style={styles.ctaBtnText}>Explore Mentors</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* TABS */}
+        <View style={styles.tabs}>
+          {['pending', 'accepted'].map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab === 'pending' ? 'Pending' : 'My Mentors'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* LIST */}
+        {loading ? (
+          <ActivityIndicator style={{ marginTop: 40 }} color={COLORS.primary} />
+        ) : (
+          <ScrollView style={{ padding: 20 }}>
+            {filtered.length > 0 ? filtered.map(req => (
+              <View key={req._id} style={styles.card}>
+
+                <View style={styles.cardTop}>
+                  <Text style={styles.name}>{req.alumni?.fullName}</Text>
+                  <View style={[
+                    styles.badge,
+                    { backgroundColor: req.status === 'accepted' ? '#E8F5E9' : '#FFF3E0' }
+                  ]}>
+                    <Text style={{
+                      color: req.status === 'accepted' ? '#4CAF50' : '#FF9800',
+                      fontSize: 11, fontWeight: '700'
+                    }}>
                       {req.status.toUpperCase()}
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.reqCompany}>{req.alumni?.professionalDetails?.companyName || req.alumni?.alumni?.company || "Company info hidden"}</Text>
-                
+
+                {/* ✅ FIXED MAPPING: Pulling from alumniDetails instead of professionalDetails */}
+                <Text style={styles.company}>
+                  {req.alumni?.alumniDetails?.role} @ {req.alumni?.alumniDetails?.company || 'Verified Alumni'}
+                </Text>
+
                 {req.status === 'accepted' && (
-                  <TouchableOpacity style={styles.chatBtn} onPress={() => router.push('/(roles)/student/StudentChatScreen')}>
-                    <MaterialCommunityIcons name="message-text-outline" size={18} color="#FFF" style={{ marginRight: 8 }} />
-                    <Text style={styles.chatBtnText}>Open Chat</Text>
+                  <TouchableOpacity
+                    style={styles.chatBtn}
+                    onPress={() => router.push({
+                      pathname: '/(roles)/student/StudentChatScreen'
+                    })}
+                  >
+                    <Text style={styles.chatText}>Open Chat</Text>
                   </TouchableOpacity>
                 )}
               </View>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="clipboard-text-outline" size={48} color={COLORS.border || '#E0E0E0'} />
-              <Text style={styles.emptyText}>No {activeTab} requests found.</Text>
-              {activeTab === 'pending' && (
-                <TouchableOpacity onPress={() => router.push('/(roles)/student/StudentExploreScreen')}>
-                  <Text style={styles.findLink}>Find a Mentor</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </ScrollView>
-      )}
-    </View>
+            )) : (
+              <View style={styles.empty}>
+                <MaterialCommunityIcons name="account-search" size={50} color="#ccc" />
+                <Text style={styles.emptyText}>No {activeTab} requests</Text>
+
+                {activeTab === 'pending' && (
+                  <TouchableOpacity onPress={() => router.push('/(roles)/student/StudentExploreScreen')}>
+                    <Text style={styles.link}>Find a Mentor</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+      </View>
+    </ScreenWrapper>
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background || '#F8F9FA' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 40, backgroundColor: '#FFF', borderBottomWidth: 1, borderColor: COLORS.border || '#F0F0F0' },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text?.primary || '#1A1A1A' },
+  container: { flex: 1 },
+
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: '#fff'
+  },
+
+  headerTitle: { fontSize: 18, fontWeight: '800' },
+
   content: { padding: 20 },
-  targetCard: { backgroundColor: '#F4F8FE', padding: 20, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#D0E3FF' },
-  targetTitle: { fontSize: 10, fontWeight: '900', color: COLORS.primary || '#007AFF', marginBottom: 8 },
-  targetName: { fontSize: 22, fontWeight: 'bold', color: '#1A1A1A' },
-  targetCompany: { fontSize: 14, color: COLORS.text?.secondary || '#666', marginTop: 4 },
-  label: { fontSize: 14, fontWeight: 'bold', color: COLORS.text?.primary || '#333', marginBottom: 12, marginTop: 10 },
-  reasonsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
-  reasonChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border || '#E0E0E0', backgroundColor: '#FFF' },
-  activeChip: { backgroundColor: COLORS.primary || '#007AFF', borderColor: COLORS.primary || '#007AFF' },
-  reasonText: { fontSize: 13, color: COLORS.text?.secondary || '#666' },
-  activeChipText: { color: '#FFF', fontWeight: 'bold' },
-  textArea: { backgroundColor: '#FFF', borderWidth: 1, borderColor: COLORS.border || '#E0E0E0', borderRadius: 12, padding: 15, fontSize: 15, textAlignVertical: 'top', height: 120 },
-  footer: { padding: 20, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: COLORS.border || '#F0F0F0' },
-  tabContainer: { flexDirection: 'row', backgroundColor: '#FFF', paddingHorizontal: 20, borderBottomWidth: 1, borderColor: COLORS.border || '#F0F0F0' },
-  tab: { flex: 1, paddingVertical: 16, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  activeTab: { borderBottomColor: COLORS.primary || '#007AFF' },
-  tabText: { fontSize: 15, fontWeight: '600', color: COLORS.text?.secondary || '#888' },
-  activeTabText: { color: COLORS.primary || '#007AFF' },
-  listContent: { padding: 20 },
-  requestCard: { backgroundColor: '#FFF', padding: 16, borderRadius: 16, marginBottom: 16, elevation: 1, borderWidth: 1, borderColor: COLORS.border || '#F0F0F0' },
-  reqHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  reqName: { fontSize: 16, fontWeight: 'bold', color: COLORS.text?.primary || '#1A1A1A' },
-  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 10, fontWeight: 'bold' },
-  reqCompany: { fontSize: 14, color: COLORS.text?.secondary || '#666', marginBottom: 16 },
-  chatBtn: { flexDirection: 'row', backgroundColor: COLORS.primary || '#007AFF', paddingVertical: 10, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  chatBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-  emptyState: { alignItems: 'center', marginTop: 60 },
-  emptyText: { color: COLORS.text?.secondary || '#888', fontSize: 16, marginTop: 16 },
-  findLink: { color: COLORS.primary || '#007AFF', fontSize: 16, fontWeight: 'bold', marginTop: 8 }
+
+  targetCard: {
+    backgroundColor: '#EEF4FF',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 20
+  },
+
+  targetLabel: { fontSize: 10, color: COLORS.primary },
+  targetName: { fontSize: 20, fontWeight: '800' },
+  targetCompany: { color: '#666' },
+
+  label: { fontWeight: '700', marginBottom: 8 },
+
+  reasonWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+
+  reasonChip: {
+    padding: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ddd'
+  },
+
+  reasonActive: { backgroundColor: COLORS.primary },
+
+  reasonText: { fontSize: 13 },
+  reasonTextActive: { color: '#fff' },
+
+  textArea: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 14,
+    height: 120
+  },
+
+  footer: { padding: 20 },
+
+  /* HUB */
+
+  cta: {
+    margin: 20,
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: '#EEF4FF'
+  },
+
+  ctaTitle: { fontWeight: '800', fontSize: 16 },
+  ctaSub: { color: '#666', marginVertical: 6 },
+
+  ctaBtn: {
+    backgroundColor: COLORS.primary,
+    padding: 10,
+    borderRadius: 10,
+    alignItems: 'center'
+  },
+
+  ctaBtnText: { color: '#fff', fontWeight: '700' },
+
+  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#eee' },
+
+  tab: { flex: 1, padding: 12, alignItems: 'center' },
+  tabActive: { borderBottomWidth: 2, borderColor: COLORS.primary },
+
+  tabText: { color: '#888' },
+  tabTextActive: { color: COLORS.primary, fontWeight: '700' },
+
+  card: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16
+  },
+
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between'
+  },
+
+  name: { fontWeight: '700' },
+  company: { color: '#666', marginTop: 4 },
+
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6
+  },
+
+  chatBtn: {
+    backgroundColor: COLORS.primary,
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
+    alignItems: 'center'
+  },
+
+  chatText: { color: '#fff', fontWeight: '700' },
+
+  empty: { alignItems: 'center', marginTop: 60 },
+  emptyText: { marginTop: 10, color: '#888' },
+  link: { color: COLORS.primary, marginTop: 10 }
 });

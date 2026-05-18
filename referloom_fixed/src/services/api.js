@@ -1,50 +1,27 @@
-
+// referloom_fixed/src/services/api.js
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
-import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
-// Replace with your local machine's IP address if testing on a physical device, 
-// or 10.0.2.2 if testing on an Android Emulator
-const API_URL = 'http://192.168.29.68:5001/api'; 
+// React Native handles localhost differently for Emulators
+// Use your computer's local IP address (e.g., 'http://192.168.1.X:5000/api') if testing on a real physical device!
+const BASE_URL = Platform.OS === 'android' ? 'http://192.168.1.8:5001/api' : 'http://localhost:5001/api';
 
 const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: BASE_URL,
+  timeout: 10000, // 10 seconds timeout
 });
 
-// 🚀 REQUEST INTERCEPTOR: Attach token to every request
+// Request Interceptor: Automatically inject the JWT token into every request
 api.interceptors.request.use(
   async (config) => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch (error) {
-      console.error("Error fetching token from SecureStore", error);
+    const token = await AsyncStorage.getItem('userToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
   (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// 🛡️ RESPONSE INTERCEPTOR: Handle expired tokens globally
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response && error.response.status === 401) {
-      console.log("🚨 Token expired or invalid. Logging out...");
-      
-      // Clear the invalid token
-      await SecureStore.deleteItemAsync('userToken');
-      
-      // Force user back to login
-      router.replace('/(auth)/LoginScreen');
-    }
     return Promise.reject(error);
   }
 );

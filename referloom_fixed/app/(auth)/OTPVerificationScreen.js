@@ -1,17 +1,21 @@
-// referloom_frontend/app/(auth)/OTPVerificationScreen.js
+// referloom_fixed/app/(auth)/OTPVerificationScreen.js
 import React, { useState, useRef } from "react";
-import { SafeAreaView, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 
 import { COLORS } from "../../src/theme/colors";
 import PrimaryButton from "../../src/components/ui/PrimaryButton";
 import { useAuth } from "../../src/context/AuthContext";
-import ScreenWrapper from '../../src/components/ui/ScreenWrapper';
+
 export default function OTPVerificationScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { email } = useLocalSearchParams(); 
-  const { verifyOtp,register, pendingUser, sendOtp } = useAuth();
+  
+  // Notice we use 'registerUser' here to match what we named it in AuthContext
+  const { verifyOtp, registerUser, pendingUser, sendOtp } = useAuth();
   
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -34,17 +38,20 @@ export default function OTPVerificationScreen() {
   const handleVerify = async () => {
     const otpString = otp.join("");
     if (otpString.length < 6) return setErrorMsg("Please enter the full 6-digit code.");
+    if (!pendingUser) return setErrorMsg("Registration data lost. Please restart.");
   
     setLoading(true);
     setErrorMsg("");
   
     try {
-      // Append the OTP to the formData we saved earlier
-      await verifyOtp(email, otpString);  // Step 1
-await register(pendingUser);    
+      // 1. Verify the OTP
+      await verifyOtp(email, otpString);  
       
+      // 2. If successful, push all data to DB to create the user!
+      await registerUser(pendingUser);    
+      
+      // Note: We don't need a router.replace here because registerUser() automatically routes them to their dashboard!
       Alert.alert("Welcome to Referloom!", "Account created successfully.");
-      router.replace("/(roles)/student"); // Route them to their dashboard
     } catch (error) {
       setErrorMsg(error || "Invalid OTP or Registration Failed");
     } finally {
@@ -65,10 +72,9 @@ await register(pendingUser);
   };
 
   return (
-    <ScreenWrapper>
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <View style={styles.content}>
           
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Feather name="arrow-left" size={24} color={COLORS.primary} />
@@ -104,14 +110,13 @@ await register(pendingUser);
 
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
-    </ScreenWrapper>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
-  container: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 20 },
   backBtn: { marginBottom: 20, width: 40, height: 40, justifyContent: "center" },
   header: { fontSize: 32, fontWeight: "800", color: COLORS.primary, marginBottom: 8 },
   subHeader: { fontSize: 15, color: COLORS.text.secondary, lineHeight: 22, marginBottom: 30 },

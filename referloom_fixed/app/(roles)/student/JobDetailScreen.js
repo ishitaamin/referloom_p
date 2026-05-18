@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, ActivityIndicator
+} from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
@@ -12,40 +15,64 @@ import ScreenWrapper from '../../../src/components/ui/ScreenWrapper';
 export default function JobDetailScreen() {
   const router = useRouter();
   const { jobId } = useLocalSearchParams();
+
+  const [hasApplied, setHasApplied] = useState(false);
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
 
   useEffect(() => {
-    const fetchJobDetails = async () => {
+    const fetchJobData = async () => {
+      // 🚨 Safety Check: Ensure jobId is valid
+      if (!jobId || typeof jobId !== 'string') {
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Backend returns the full job document + custom AI suggestions for this student
-        const response = await api.get(`/jobs/${jobId}`);
-        setJob(response.data);
-      } catch (error) {
-        Toast.show({ type: 'error', text1: 'Error loading job details' });
+        // Fetch Job Details AND Application Status at the same time for speed
+        const [jobRes, appsRes] = await Promise.all([
+          api.get(`/jobs/${jobId}`),
+          api.get('/jobs/my-applications')
+        ]);
+
+        setJob(jobRes.data);
+
+        // Check if the student has already applied for this specific job
+        const alreadyApplied = appsRes.data.some(app => app.job?._id === jobId);
+        setHasApplied(alreadyApplied);
+
+      } catch (err) {
+        console.error("Axios Error on Job Detail:", err);
+        Toast.show({ 
+          type: 'error', 
+          text1: 'Job Not Found', 
+          text2: 'This job may have been closed or removed.' 
+        });
+        router.back(); 
       } finally {
         setLoading(false);
       }
     };
-    if (jobId) fetchJobDetails();
+
+    fetchJobData();
   }, [jobId]);
 
   const handleApply = async () => {
     setApplying(true);
     try {
       await api.post(`/jobs/${job._id}/apply`);
+      setHasApplied(true); // Instantly update UI
       Toast.show({
         type: 'success',
         text1: 'Application Sent!',
-        text2: 'The recruiter now has full access to your profile.',
+        text2: 'Recruiter can now view your profile 🚀',
       });
-      router.back();
-    } catch (error) {
+    } catch (err) {
       Toast.show({
         type: 'error',
         text1: 'Application Failed',
-        text2: error.response?.data?.message || 'Something went wrong',
+        text2: err.response?.data?.message || 'Something went wrong',
       });
     } finally {
       setApplying(false);
@@ -53,96 +80,138 @@ export default function JobDetailScreen() {
   };
 
   if (loading || !job) {
-    return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
   }
 
-  // Format the date
   const postedDate = new Date(job.createdAt).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric'
   });
 
   return (
     <ScreenWrapper>
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Feather name="arrow-left" size={24} color={COLORS.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Role Details</Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <View style={styles.container}>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* --- 1. FULL JOB IDENTITY --- */}
-        <View style={styles.jobHeader}>
-          <Text style={styles.jobTitle}>{job.title}</Text>
-          <Text style={styles.companyName}>{job.companyName} • {job.location}</Text>
-          
-          {/* Meta Data Row: Job Type, Salary, Date */}
-          <View style={styles.metaRow}>
-            <View style={styles.metaBadge}>
-              <Feather name="briefcase" size={14} color={COLORS.primary} />
-              <Text style={styles.metaText}>{job.jobType}</Text>
-            </View>
-            
-            {job.salaryRange && (
-              <View style={[styles.metaBadge, { backgroundColor: '#E8F5E9' }]}>
-                <Feather name="dollar-sign" size={14} color="#2E7D32" />
-                <Text style={[styles.metaText, { color: '#2E7D32' }]}>{job.salaryRange}</Text>
-              </View>
-            )}
-
-            <View style={styles.metaBadge}>
-              <Feather name="clock" size={14} color={COLORS.text.secondary} />
-              <Text style={[styles.metaText, { color: COLORS.text.secondary }]}>Posted {postedDate}</Text>
-            </View>
-          </View>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Feather name="arrow-left" size={24} color={COLORS.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Role Details</Text>
+          <View style={{ width: 24 }} />
         </View>
 
-        {/* --- 2. AI FIT SCORE ANALYSIS --- */}
-        <View style={styles.aiSection}>
-          <View style={styles.aiHeaderRow}>
-            <FitScoreBadge score={job.fitScore} size={70} />
-            <View style={styles.aiHeaderTextContainer}>
-              <Text style={styles.aiTitle}>AI Fit Analysis</Text>
-              <Text style={styles.aiSubtitle}>Based on your verified projects</Text>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+
+          {/* JOB HEADER */}
+          <View style={styles.jobHeader}>
+            <View style={styles.companyRow}>
+              <View style={styles.logoBox}>
+                <Feather name="briefcase" size={20} color={COLORS.primary} />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text style={styles.jobTitle}>{job.title}</Text>
+                <Text style={styles.companyName}>
+                  {job.companyName} • {job.location}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.metaRow}>
+              <View style={styles.metaBadge}>
+                <Feather name="briefcase" size={14} color={COLORS.primary} />
+                <Text style={styles.metaText}>{job.jobType}</Text>
+              </View>
+
+              <View style={styles.metaBadge}>
+                <Feather name="clock" size={14} color={COLORS.text.secondary} />
+                <Text style={styles.metaText}>Posted {postedDate}</Text>
+              </View>
+
+              <View style={styles.hiringBadge}>
+                <Text style={styles.hiringText}>Actively Hiring</Text>
+              </View>
             </View>
           </View>
 
-          {job.aiSuggestions && job.aiSuggestions.length > 0 && (
-            <View style={styles.suggestionsContainer}>
-              <Text style={styles.suggestionsTitle}>How to improve your match:</Text>
-              {job.aiSuggestions.map((suggestion, index) => (
-                <View key={index} style={styles.suggestionRow}>
-                  <MaterialCommunityIcons name="lightbulb-on-outline" size={20} color="#FF9800" />
-                  <Text style={styles.suggestionText}>{suggestion}</Text>
+          {/* DYNAMIC AI SECTION */}
+          <View style={styles.aiSection}>
+            <View style={styles.aiTop}>
+              <FitScoreBadge score={job.fitScore} size={80} />
+
+              <View style={{ marginLeft: 16 }}>
+                <Text style={styles.aiTitle}>Your Match Score</Text>
+
+                <Text style={styles.matchLabel}>
+                  {job.fitScore >= 85
+                    ? '🔥 Strong Match'
+                    : job.fitScore >= 60
+                    ? '👍 Good Match'
+                    : '⚡ Needs Improvement'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Render Dynamic AI Suggestions from Backend */}
+            {job.aiSuggestions?.length > 0 && (
+              <>
+                <Text style={styles.suggestionsTitle}>Improve your chances:</Text>
+
+                {job.aiSuggestions.map((s, i) => (
+                  <View key={i} style={styles.suggestionRow}>
+                    <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color="#FF9800" style={{ marginTop: 2 }} />
+                    <Text style={styles.suggestionText}>{s}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+          </View>
+
+          {/* INSIGHT */}
+          <View style={styles.insightCard}>
+            <Text style={styles.insightTitle}>Why this job fits you</Text>
+            <Text style={styles.insightText}>
+              Based on your projects and skills, you align well with this role.
+              Applying increases your chances of getting noticed.
+            </Text>
+          </View>
+
+          {/* DESCRIPTION */}
+          <View style={styles.detailsSection}>
+            <Text style={styles.sectionTitle}>About the Role</Text>
+            <Text style={styles.description}>{job.description}</Text>
+
+            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
+              Required Skills
+            </Text>
+
+            <View style={styles.tagsContainer}>
+              {job.requirements?.map((skill, i) => (
+                <View key={i} style={styles.tag}>
+                  <Text style={styles.tagText}>{skill}</Text>
                 </View>
               ))}
             </View>
-          )}
-        </View>
-
-        {/* --- 3. FULL DESCRIPTION & REQUIREMENTS --- */}
-        <View style={styles.detailsSection}>
-          <Text style={styles.sectionTitle}>About the Role</Text>
-          <Text style={styles.description}>{job.description}</Text>
-          
-          <Text style={[styles.sectionTitle, {marginTop: 24}]}>Required Skills</Text>
-          <View style={styles.tagsContainer}>
-            {/* Make sure it uses job.requirements! */}
-            {job.requirements?.map((skill, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{skill}</Text>
-              </View>
-            ))}
           </View>
-        </View>
-      </ScrollView>
 
-      <View style={styles.footer}>
-        <PrimaryButton title="Apply Now & Unlock Profile" onPress={handleApply} isLoading={applying} />
+        </ScrollView>
+
+        {/* CTA */}
+        <View style={styles.footer}>
+          <PrimaryButton
+            title={hasApplied ? "Application Submitted ✅" : "Apply & Get Noticed 🚀"}
+            onPress={handleApply}
+            isLoading={applying}
+            disabled={hasApplied} 
+            style={hasApplied ? { backgroundColor: '#ccc' } : {}}
+          />
+        </View>
+
       </View>
-    </View>
     </ScreenWrapper>
   );
 }
@@ -150,29 +219,34 @@ export default function JobDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 40, backgroundColor: '#FFF', borderBottomWidth: 1, borderColor: COLORS.border },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text.primary },
+  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, paddingTop: 40, backgroundColor: '#FFF' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold' },
   content: { padding: 20 },
   jobHeader: { marginBottom: 24 },
-  jobTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.text.primary },
-  companyName: { fontSize: 16, color: COLORS.text.secondary, marginTop: 4, fontWeight: '500' },
+  companyRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  logoBox: { width: 50, height: 50, borderRadius: 12, backgroundColor: `${COLORS.primary}15`, justifyContent: 'center', alignItems: 'center' },
+  jobTitle: { fontSize: 22, fontWeight: 'bold' },
+  companyName: { color: COLORS.text.secondary, marginTop: 2 },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, gap: 8 },
-  metaBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E3F2FD', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  metaText: { fontSize: 13, color: COLORS.primary, fontWeight: '600', marginLeft: 6 },
-  aiSection: { backgroundColor: '#F4F8FE', padding: 20, borderRadius: 16, marginBottom: 24, borderWidth: 1, borderColor: '#D0E3FF' },
-  aiHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  aiHeaderTextContainer: { marginLeft: 16, flex: 1 },
-  aiTitle: { fontSize: 18, fontWeight: 'bold', color: '#1A365D' },
-  aiSubtitle: { fontSize: 13, color: '#4A5568', marginTop: 2 },
-  suggestionsContainer: { backgroundColor: '#FFF', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  suggestionsTitle: { fontSize: 14, fontWeight: 'bold', color: COLORS.text.primary, marginBottom: 12 },
-  suggestionRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-  suggestionText: { flex: 1, fontSize: 14, color: COLORS.text.secondary, marginLeft: 8, lineHeight: 20 },
-  detailsSection: { marginBottom: 40 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text.primary, marginBottom: 12 },
-  description: { fontSize: 15, color: COLORS.text.secondary, lineHeight: 24 },
-  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap' },
-  tag: { backgroundColor: COLORS.surface, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, marginRight: 8, marginBottom: 8, borderWidth: 1, borderColor: COLORS.border },
-  tagText: { fontSize: 14, color: COLORS.text.primary, fontWeight: '500' },
+  metaBadge: { flexDirection: 'row', backgroundColor: '#E3F2FD', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  metaText: { marginLeft: 6, fontSize: 12 },
+  hiringBadge: { backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  hiringText: { fontSize: 12, color: '#2E7D32', fontWeight: '700' },
+  aiSection: { backgroundColor: '#EEF4FF', padding: 20, borderRadius: 20, marginBottom: 20 },
+  aiTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  aiTitle: { fontSize: 16, fontWeight: '700' },
+  matchLabel: { marginTop: 4, color: COLORS.primary, fontWeight: '600' },
+  suggestionsTitle: { marginTop: 10, fontWeight: '700' },
+  suggestionRow: { flexDirection: 'row', marginTop: 10, paddingRight: 10 },
+  suggestionText: { marginLeft: 8, color: COLORS.text.secondary, lineHeight: 20, flex: 1 },
+  insightCard: { backgroundColor: '#FFF8E1', padding: 16, borderRadius: 16, marginBottom: 20 },
+  insightTitle: { fontWeight: '700', marginBottom: 6 },
+  insightText: { color: COLORS.text.secondary, lineHeight: 20 },
+  detailsSection: { paddingBottom: 20 },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  description: { marginTop: 6, color: COLORS.text.secondary, lineHeight: 20 },
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 },
+  tag: { backgroundColor: COLORS.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, marginRight: 8, marginBottom: 8 },
+  tagText: { fontSize: 12 },
   footer: { padding: 20, backgroundColor: '#FFF', borderTopWidth: 1, borderColor: COLORS.border }
 });

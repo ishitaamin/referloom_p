@@ -1,256 +1,216 @@
-import React from "react";
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import viditpic from "../../../assets/images/vidit.jpg";
-import dhyeypic from "../../../assets/images/dhyey.jpg";
-import devpic from "../../../assets/images/dev.jpg";
-import vanshipic from "../../../assets/images/vanshi.jpg";
-import dhvanikapic from "../../../assets/images/dhvani.jpg";
-import riyapic from "../../../assets/images/riya.jpg"; 
-import { useRouter } from "expo-router";
+  View, Text, StyleSheet, FlatList,
+  TouchableOpacity, ActivityIndicator
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import api from '../../../src/services/api';
+import { COLORS } from '../../../src/theme/colors';
 import ScreenWrapper from '../../../src/components/ui/ScreenWrapper';
 
-export default function ChatScreen() {
-  const router = useRouter();  
+export default function StudentChatScreen() {
+  const router = useRouter();
 
-  const messages = [
-    {
-      id: 1,
-      name: "Dhyey Bhandari",
-      text: "Hey, do you have a moment to chat about the...",
-      avatar: dhyeypic,
-      time: "",
-    },
-    {
-      id: 2,
-      name: "Dev Bagga",
-      text: "Perfect, I'll send over the documents shortly.",
-      avatar: devpic,
-      time: "",
-    },
-    {
-      id: 3,
-      name: "Vidit Shah",
-      text: "Thanks for the feedback!",
-      avatar: viditpic,
-      time: "Mon",
-    },
-    {
-      id: 4,
-      name: "Vanshi Mehta",
-      text: "Could you review this proposal?",
-      avatar: vanshipic,
-      time: "Oct 28",
-      unread: 1,
-    },
-    {
-      id: 5,
-      name: "Dhvanika Naik",
-      text: "You too! Have a great weekend.",
-      avatar: dhvanikapic,
-      time: "Oct 27",
-    },
-  ];
+  const [chats, setChats] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchChats();
+  }, []);
+
+  const fetchChats = async () => {
+    try {
+      const res = await api.get('/mentorship/requests');
+
+      // ✅ only accepted chats
+      const accepted = res.data.filter(r => r.status === 'accepted');
+
+      setChats(accepted);
+    } catch (err) {
+      console.log(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderItem = ({ item }) => {
+    const user = item.alumni;
+
+    return (
+      <TouchableOpacity
+        style={styles.chatCard}
+        onPress={() =>
+          router.push({
+            pathname: '/(roles)/student/ChatRoomScreen',
+            params: {
+              userId: user?._id,
+              name: user?.fullName,
+              company: user?.professionalDetails?.companyName
+            }
+          })
+        }
+      >
+        {/* Avatar */}
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {user?.fullName?.charAt(0) || 'U'}
+          </Text>
+        </View>
+
+        {/* Info */}
+        <View style={styles.chatInfo}>
+          <Text style={styles.name}>
+            {user?.fullName || 'Unknown'}
+          </Text>
+          <Text style={styles.company}>
+            {user?.professionalDetails?.companyName || 'Alumni'}
+          </Text>
+
+          <Text style={styles.lastMsg}>
+            Tap to start conversation →
+          </Text>
+        </View>
+
+        {/* Arrow */}
+        <Feather name="chevron-right" size={20} color="#999" />
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScreenWrapper>
-    <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <View style={styles.container}>
+
         {/* HEADER */}
-        <View style={styles.headerRow}>
-          <Text style={styles.header}>Referloom</Text>
-
-          <View style={styles.headerIcons}>
-
-            <TouchableOpacity onPress={() =>navigation.navigate("home/ProfileScreen")}>
-  <Image
-    source={require("../../../assets/images/profile.jpg")}
-    style={styles.profile}
-  />
-</TouchableOpacity>
-
-          </View>
+        <View style={styles.header}>
+          <Text style={styles.title}>Your Chats</Text>
+          <Text style={styles.subtitle}>
+            Mentors & connections ready to chat
+          </Text>
         </View>
 
-        {/* Mentorship Request Section */}
-        <Text style={styles.sectionTitle}>Mentorship Requests</Text>
-
-        <View style={styles.requestCard}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Image
-              source={require("../../../assets/images/riya.jpg")}
-              style={styles.requestAvatar}
-            />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.reqName}>Riya Patel</Text>
-              <Text style={styles.reqText}>
-                Wants to connect for mentorship.
+        {/* LIST */}
+        <FlatList
+          data={chats}
+          keyExtractor={(item) => item._id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Feather name="message-circle" size={40} color="#ccc" />
+              <Text style={styles.emptyText}>
+                No chats yet. Get mentorship accepted first.
               </Text>
             </View>
-          </View>
-
-          {/* Buttons */}
-          <View style={styles.reqBtnRow}>
-            <TouchableOpacity style={styles.declineBtn}>
-              <Text style={styles.declineText}>Decline</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.acceptBtn}>
-              <Text style={styles.acceptText}>Accept</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.line} />
-
-        {/* Chat List */}
-        {messages.map((msg) => (
-  <TouchableOpacity key={msg.id} style={styles.chatRow}>
-    <Image source={msg.avatar} style={styles.chatAvatar} />
-
-    <View style={{ flex: 1 }}>
-      <Text style={styles.chatName}>{msg.name}</Text>
-      <Text style={styles.chatText}>{msg.text}</Text>
-    </View>
-
-    <View style={{ alignItems: "flex-end" }}>
-      {msg.time !== "" && <Text style={styles.timeText}>{msg.time}</Text>}
-
-      {msg.unread && (
-        <View style={styles.unreadBadge}>
-          <Text style={styles.unreadText}>{msg.unread}</Text>
-        </View>
-      )}
-    </View>
-  </TouchableOpacity>
-))}
-
-
-        <View style={{ height: 90 }} />
-      </ScrollView>
-
-      
-    </View>
+          }
+        />
+      </View>
     </ScreenWrapper>
   );
 }
 
+/* ---------------- STYLES ---------------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-
-  headerRow: {
-    paddingTop: 40,
-    paddingHorizontal: 18,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background
   },
 
-  header: { fontSize: 24, fontWeight: "700", color: "#1c1c1e" },
-
-  headerIcons: { flexDirection: "row", alignItems: "center", gap: 12 },
-
-  profile: { width: 32, height: 32, borderRadius: 50 },
-
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    marginTop: 25,
-    marginBottom: 10,
-    paddingHorizontal: 18,
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
 
-  requestCard: {
-    backgroundColor: "#fff",
-    marginHorizontal: 18,
+  header: {
+    padding: 20,
+    paddingTop: 50,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderColor: COLORS.border
+  },
+
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.text.primary
+  },
+
+  subtitle: {
+    color: COLORS.text.secondary,
+    marginTop: 4
+  },
+
+  list: {
+    padding: 16
+  },
+
+  chatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
     padding: 14,
     borderRadius: 14,
-    borderColor: "#E5E7EB",
+    marginBottom: 12,
     borderWidth: 1,
+    borderColor: COLORS.border
   },
 
-  requestAvatar: { width: 48, height: 48, borderRadius: 50 },
-
-  reqName: { fontSize: 16, fontWeight: "600" },
-
-  reqText: { fontSize: 13, color: "#6b7280", marginTop: 2 },
-
-  reqBtnRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 14,
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
 
-  declineBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: "#E5E7EB",
+  avatarText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1976D2'
   },
 
-  declineText: { fontSize: 14, color: "#374151", fontWeight: "600" },
-
-  acceptBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: "#2ECC71",
+  chatInfo: {
+    flex: 1,
+    marginLeft: 12
   },
 
-  acceptText: { fontSize: 14, color: "#fff", fontWeight: "600" },
-
-  line: {
-    height: 1,
-    backgroundColor: "#E5E7EB",
-    marginVertical: 20,
-    marginHorizontal: 18,
+  name: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.text.primary
   },
 
-  chatRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    
+  company: {
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    marginTop: 2
   },
 
-  chatAvatar: { width: 48, height: 48, borderRadius: 50 },
-
-  chatName: { fontSize: 15, fontWeight: "600",paddingLeft:10 },
-
-  chatText: { fontSize: 13, color: "#6b7280", marginTop: 1,paddingLeft:10 },
-
-  timeText: { fontSize: 12, color: "#6b7280", marginBottom: 6 },
-
-  unreadBadge: {
-    backgroundColor: "#2ECC71",
-    width: 20,
-    height: 20,
-    borderRadius: 50,
-    justifyContent: "center",
-    alignItems: "center",
+  lastMsg: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4
   },
 
-  unreadText: { color: "#fff", fontSize: 12 },
-
-  footer: {
-    height: 65,
-    flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#fff",
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
+  empty: {
+    alignItems: 'center',
+    marginTop: 80
   },
+
+  emptyText: {
+    marginTop: 10,
+    color: '#888',
+    textAlign: 'center'
+  }
 });

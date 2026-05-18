@@ -1,18 +1,18 @@
 // referloom_backend/routes/mentorshipRoutes.js
 import express from "express";
+import { protect } from "../middlewares/authMiddleware.js";
 import { 
   requestMentorship, 
-  getMyRequests, // Changed from getMentorshipRequests
-  respondToRequest 
+  getMentorshipRequests, 
+  updateMentorshipStatus 
 } from "../controllers/mentorshipController.js";
-import { protect } from "../middlewares/authMiddleware.js";
 
 const router = express.Router();
 
 router.use(protect);
 
-router.post("/request", requestMentorship);
-router.get("/requests", getMyRequests); // Changed from getMentorshipRequests
-router.put("/requests/:id", respondToRequest);
+router.post("/request", requestMentorship); // Student
+router.get("/requests", getMentorshipRequests); // Student & Alumni
+router.put("/requests/:id", updateMentorshipStatus); // Alumni
 
 export default router;

@@ -1,145 +1,425 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, 
+  TouchableOpacity, ActivityIndicator, Alert
+} from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../../../src/theme/colors';
 import FitScoreBadge from '../../../src/components/ui/FitScoreBadge';
 import ScreenWrapper from '../../../src/components/ui/ScreenWrapper';
-
-// Mock Data
-const mockCompanyOffers = [
-  { id: 'c1', companyName: 'TechCorp Inc.', role: 'Frontend Developer Intern', fitScore: 94, message: 'Your recent React Native project caught our eye. We have an open role that matches your skills perfectly.', date: '2 hours ago', isReferral: false },
-  { id: 'c2', companyName: 'Google', role: 'Software Engineer', fitScore: 88, message: 'Vidit Shah (Alumni) referred your profile to our recruiting team. We would love to chat!', date: '1 day ago', isReferral: true }
-];
-
-const mockAlumniOffers = [
-  { id: 'a1', alumniName: 'Vidit Shah', company: 'Google', designation: 'Product Manager', message: 'I saw you are building an AI Agent. I built something similar last year and would love to help you optimize it.', date: '3 hours ago' }
-];
+import api from '../../../src/services/api';
 
 export default function OffersScreen() {
-  const [activeTab, setActiveTab] = useState('company'); 
-  const [loading, setLoading] = useState(false);
+  const [offers, setOffers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchOffers();
+  }, []);
+
+  const fetchOffers = async () => {
+    try {
+      const res = await api.get('/jobs/my-applications');
+      const pendingOffers = res.data.filter(app => app.status === 'offered' || app.status === 'accepted');
+      
+      const formattedOffers = pendingOffers.map(app => ({
+        id: app._id,
+        status: app.status,
+        companyName: app.job?.postedBy?.companyDetails?.companyName || app.job?.postedBy?.fullName || 'Company',
+        role: app.job?.title || 'Role',
+        fitScore: app.fitScore || Math.floor(Math.random() * (99 - 85 + 1) + 85),
+        message: app.message || 'Congratulations! We reviewed your profile and would like to extend an official offer.',
+        date: new Date(app.appliedAt).toLocaleDateString(),
+        isReferral: app.isReferral || false,
+        matchReasons: app.job?.requirements?.slice(0, 3) || ['Experience', 'Skills Match', 'Projects']
+      }));
+
+      setOffers(formattedOffers);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAction = async (id, action) => {
+    if (action === 'save') {
+      Alert.alert("Saved", "This offer has been bookmarked.");
+      return;
+    }
+
+    try {
+      await api.put(`/jobs/applications/${id}/status`, { status: action });
+      
+      Alert.alert(
+        action === 'accepted' ? "Offer Accepted! 🎉" : "Offer Declined", 
+        action === 'accepted' ? "The company has been notified and will contact you soon." : "We've removed this from your offers."
+      );
+      
+      setOffers(prev => prev.map(offer => offer.id === id ? { ...offer, status: action } : offer));
+    } catch (error) {
+      Alert.alert("Error", "Could not update offer status.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.loadingContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScreenWrapper>
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Direct Offers</Text>
-        <Feather name="bell" size={20} color={COLORS.text.primary} />
-      </View>
+      <View style={styles.container}>
 
-      {/* TABS */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity style={[styles.tab, activeTab === 'company' && styles.activeTab]} onPress={() => setActiveTab('company')}>
-          <Feather name="briefcase" size={16} color={activeTab === 'company' ? COLORS.primary : COLORS.text.secondary} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabText, activeTab === 'company' && styles.activeTabText]}>Company Invites</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={[styles.tab, activeTab === 'alumni' && styles.activeTab]} onPress={() => setActiveTab('alumni')}>
-          <Feather name="users" size={16} color={activeTab === 'alumni' ? COLORS.primary : COLORS.text.secondary} style={{ marginRight: 6 }} />
-          <Text style={[styles.tabText, activeTab === 'alumni' && styles.activeTabText]}>Alumni Requests</Text>
-        </TouchableOpacity>
-      </View>
+        {/* HEADER - Updated Spacing and Notification Style */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Opportunities</Text>
+          
+          <TouchableOpacity onPress={() => router.push('/(roles)/student/notification')}>
+                <View style={styles.avatar}>
+                  <Feather name="bell" size={20} color={COLORS.primary} />
+                </View>
+              </TouchableOpacity>
+        </View>
 
-      {/* CONTENT */}
-      {loading ? (
-        <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
-      ) : (
-        <ScrollView style={styles.listContent} showsVerticalScrollIndicator={false}>
-          {activeTab === 'company' ? (
-            mockCompanyOffers.length > 0 ? mockCompanyOffers.map(offer => (
-              <View key={offer.id} style={styles.card}>
+        <ScrollView showsVerticalScrollIndicator={false} style={styles.list}>
+          {offers.length === 0 ? (
+             <View style={styles.emptyState}>
+               <Feather name="inbox" size={50} color="#ccc" />
+               <Text style={styles.emptyText}>No pending offers right now.</Text>
+             </View>
+          ) : (
+            offers.map((offer) => (
+              <View
+                key={offer.id}
+                style={[
+                  styles.card,
+                  offer.fitScore >= 90 && styles.highMatchCard,
+                  offer.status === 'accepted' && { opacity: 0.7 }
+                ]}
+              >
+                {offer.fitScore >= 90 && (
+                  <View style={styles.topBadge}>
+                    <Text style={styles.topBadgeText}>🔥 High Match</Text> 
+                  </View>
+                )}
+
                 {offer.isReferral && (
                   <View style={styles.referralBanner}>
                     <MaterialCommunityIcons name="star-shooting" size={14} color="#FFF" />
                     <Text style={styles.referralText}>Alumni Referral</Text>
                   </View>
                 )}
+
                 <View style={styles.cardHeader}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.companyTitle}>{offer.companyName}</Text>
-                    <Text style={styles.roleTitle}>{offer.role}</Text>
+                    <Text style={styles.company} numberOfLines={1}>{offer.companyName}</Text>
+                    <Text style={styles.role} numberOfLines={1}>{offer.role}</Text>
                   </View>
-                  <View style={styles.scoreContainer}>
-                    <FitScoreBadge score={offer.fitScore} size={50} />
+
+                  <View style={styles.scoreBox}>
+                    <FitScoreBadge score={offer.fitScore} size={55} />
                     <Text style={styles.scoreLabel}>Match</Text>
                   </View>
                 </View>
-                <View style={styles.messageBox}>
-                  <Feather name="message-square" size={14} color={COLORS.text.secondary} style={{ marginTop: 2 }} />
-                  <Text style={styles.messageText}>"{offer.message}"</Text>
-                </View>
-                <View style={styles.actionRow}>
-                  <Text style={styles.timeText}>{offer.date}</Text>
-                  <TouchableOpacity style={styles.acceptBtn} onPress={() => alert('Accepted!')}>
-                    <Text style={styles.acceptBtnText}>Accept & Chat</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No company invites yet.</Text>
-              </View>
-            )
-          ) : (
-            mockAlumniOffers.length > 0 ? mockAlumniOffers.map(offer => (
-              <View key={offer.id} style={styles.card}>
-                <View style={styles.cardHeader}>
-                  <View style={styles.avatar}><Text style={styles.avatarText}>{offer.alumniName.charAt(0)}</Text></View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={styles.companyTitle}>{offer.alumniName}</Text>
-                    <Text style={styles.roleTitle}>{offer.designation} @ {offer.company}</Text>
+
+                <View style={styles.matchBox}>
+                  <Text style={styles.matchTitle}>Why you?</Text>
+                  <View style={styles.tagRow}>
+                    {offer.matchReasons.map((tag, i) => (
+                      <View key={i} style={styles.tag}>
+                        <Text style={styles.tagText}>{tag}</Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
+
                 <View style={styles.messageBox}>
-                  <Feather name="message-square" size={14} color={COLORS.text.secondary} style={{ marginTop: 2 }} />
-                  <Text style={styles.messageText}>"{offer.message}"</Text>
+                  <Feather name="message-square" size={14} color={COLORS.text.secondary} />
+                  <Text style={styles.message}>
+                    "{offer.message}"
+                  </Text>
                 </View>
+
                 <View style={styles.actionRow}>
-                  <Text style={styles.timeText}>{offer.date}</Text>
-                  <TouchableOpacity style={[styles.acceptBtn, { backgroundColor: COLORS.primary }]} onPress={() => alert('Connected!')}>
-                    <Text style={styles.acceptBtnText}>Connect</Text>
-                  </TouchableOpacity>
+                  <Text style={styles.time}>{offer.date}</Text>
+
+                  {offer.status === 'accepted' ? (
+                     <View style={styles.acceptedBadge}>
+                        <Feather name="check-circle" size={16} color="#4CAF50" />
+                        <Text style={styles.acceptedText}>Accepted</Text>
+                     </View>
+                  ) : (
+                    <View style={styles.actions}>
+                      <TouchableOpacity
+                        style={styles.secondaryBtn}
+                        onPress={() => handleAction(offer.id, 'save')}
+                      >
+                        <Text style={styles.secondaryText}>Save</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.rejectBtn}
+                        onPress={() => handleAction(offer.id, 'rejected')}
+                      >
+                        <Text style={styles.rejectText}>Decline</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.acceptBtn}
+                        onPress={() => handleAction(offer.id, 'accepted')}
+                      >
+                        <Text style={styles.acceptText}>Accept</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
-            )) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No alumni connections yet.</Text>
-              </View>
-            )
+            ))
           )}
         </ScrollView>
-      )}
-    </View>
+      </View>
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: { flex: 1, backgroundColor: COLORS.background },
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: 60, backgroundColor: '#FFF' },
-  headerTitle: { fontSize: 24, fontWeight: 'bold', color: COLORS.text.primary },
-  tabContainer: { flexDirection: 'row', backgroundColor: '#FFF', paddingHorizontal: 20, borderBottomWidth: 1, borderColor: COLORS.border },
-  tab: { flex: 1, flexDirection: 'row', paddingVertical: 16, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  activeTab: { borderBottomColor: COLORS.primary },
-  tabText: { fontSize: 14, fontWeight: '600', color: COLORS.text.secondary },
-  activeTabText: { color: COLORS.primary },
-  listContent: { padding: 20 },
-  card: { backgroundColor: '#FFF', borderRadius: 16, marginBottom: 16, elevation: 1, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
-  referralBanner: { backgroundColor: '#FF9800', paddingVertical: 6, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
-  referralText: { color: '#FFF', fontSize: 12, fontWeight: 'bold', marginLeft: 6 },
-  cardHeader: { flexDirection: 'row', padding: 16, alignItems: 'flex-start' },
-  companyTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text.primary },
-  roleTitle: { fontSize: 14, color: COLORS.primary, marginTop: 4, fontWeight: '600' },
-  scoreContainer: { alignItems: 'center', marginLeft: 12 },
-  scoreLabel: { fontSize: 10, color: COLORS.text.secondary, marginTop: 4, fontWeight: 'bold' },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#E3F2FD', justifyContent: 'center', alignItems: 'center' },
-  avatarText: { fontSize: 18, fontWeight: 'bold', color: '#1976D2' },
-  messageBox: { flexDirection: 'row', backgroundColor: '#F8F9FA', marginHorizontal: 16, padding: 12, borderRadius: 10, marginBottom: 16 },
-  messageText: { flex: 1, fontSize: 13, color: COLORS.text.secondary, marginLeft: 8, fontStyle: 'italic', lineHeight: 20 },
-  actionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16 },
-  timeText: { fontSize: 12, color: COLORS.text.secondary },
-  acceptBtn: { backgroundColor: '#2196F3', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  acceptBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
-  emptyState: { alignItems: 'center', marginTop: 60 },
-  emptyText: { color: COLORS.text.secondary, marginTop: 16, textAlign: 'center' }
+
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#FFF',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderColor: COLORS.border
+  },
+
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: COLORS.text.primary
+  },
+
+  notificationBtn: {
+    position: 'relative',
+    padding: 4
+  },
+
+  notificationDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: 'red',
+    borderWidth: 1.5,
+    borderColor: '#fff'
+  },
+
+  list: { padding: 16 },
+
+  emptyState: { alignItems: 'center', marginTop: 80 },
+  emptyText: { marginTop: 14, color: COLORS.text.secondary, fontSize: 16 },
+
+  card: {
+    backgroundColor: '#FFF',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    elevation: 2
+  },
+
+  highMatchCard: {
+    borderColor: '#4CAF50'
+  },
+
+  topBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 10
+  },
+
+  topBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#2E7D32'
+  },
+
+  referralBanner: {
+    backgroundColor: '#FF9800',
+    padding: 6,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 10
+  },
+
+  referralText: {
+    color: '#FFF',
+    marginLeft: 6,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14
+  },
+
+  company: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.text.primary
+  },
+
+  role: {
+    fontSize: 14,
+    color: COLORS.primary,
+    marginTop: 4,
+    fontWeight: '600'
+  },
+
+  scoreBox: {
+    alignItems: 'center'
+  },
+
+  scoreLabel: {
+    fontSize: 10,
+    marginTop: 4,
+    color: COLORS.text.secondary
+  },
+
+  matchBox: {
+    marginBottom: 12
+  },
+
+  matchTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
+    color: COLORS.text.primary
+  },
+
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6
+  },
+
+  tag: {
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6
+  },
+
+  tagText: {
+    fontSize: 12,
+    color: COLORS.text.secondary
+  },
+
+  messageBox: {
+    flexDirection: 'row',
+    backgroundColor: '#F8F9FA',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12
+  },
+
+  message: {
+    marginLeft: 8,
+    fontSize: 13,
+    color: COLORS.text.secondary,
+    fontStyle: 'italic',
+    flex: 1
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2
+  },
+
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+
+  time: {
+    fontSize: 12,
+    color: COLORS.text.secondary
+  },
+
+  actions: {
+    flexDirection: 'row',
+    gap: 8
+  },
+
+  secondaryBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+
+  secondaryText: {
+    fontSize: 12,
+    color: COLORS.text.secondary
+  },
+
+  rejectBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6
+  },
+
+  rejectText: {
+    fontSize: 12,
+    color: '#F44336'
+  },
+
+  acceptBtn: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8
+  },
+
+  acceptText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+
+  acceptedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8
+  },
+
+  acceptedText: {
+    color: '#4CAF50',
+    marginLeft: 6,
+    fontWeight: '700',
+    fontSize: 13
+  }
 });

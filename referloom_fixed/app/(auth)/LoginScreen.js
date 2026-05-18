@@ -1,76 +1,82 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
 import ScreenWrapper from '../../src/components/ui/ScreenWrapper';
-// 1. THIS IS THE MISSING IMPORT!
+
 import { useAuth } from '../../src/context/AuthContext'; 
 
-// 2. Import your UI components and theme
+// Import your UI components and theme
 import { COLORS } from '../../src/theme/colors';
 import PrimaryButton from '../../src/components/ui/PrimaryButton';
 import CustomInput from '../../src/components/ui/CustomInput';
 
 export default function LoginScreen() {
-  // Now useAuth is properly imported and can be used here
   const { login, isLoading } = useAuth();
+  
+  // You are using individual state variables here (which is perfectly fine!)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    // ✅ FIXED: Checking the 'email' and 'password' variables directly
     if (!email || !password) {
-      alert("Please enter your email and password");
+      Alert.alert("Missing Fields", "Please enter your email and password.");
       return;
     }
 
+    setLoading(true);
     try {
+      // ✅ FIXED: Passing the direct variables to the login function
       await login(email, password);
-      router.replace('/'); 
+      // Note: Router pushing is handled inside AuthContext now, so we don't need router.replace('/') here!
     } catch (error) {
-      // Add this console.log to see the exact network failure in your Expo terminal
       console.error("🚨 FULL LOGIN ERROR:", error); 
-      alert("Login failed: " + (error.message || error));
+      Alert.alert("Login Failed", typeof error === 'string' ? error : error.message || "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <ScreenWrapper>
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome Back</Text>
-      <Text style={styles.subtitle}>Login to continue to Referloom</Text>
+      <View style={styles.container}>
+        <Text style={styles.title}>Welcome Back</Text>
+        <Text style={styles.subtitle}>Login to continue to Referloom</Text>
 
-      <CustomInput
-  label="Email Address"
-  icon="mail"
-  placeholder="Enter your college or work email"
-  value={email}
-  onChangeText={setEmail}
-  autoCapitalize="none"
-  keyboardType="email-address"
-/>
+        <CustomInput
+          label="Email Address"
+          icon="mail"
+          placeholder="Enter your college or work email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
 
-<CustomInput
-  label="Password"
-  icon="lock"
-  placeholder="Enter your password"
-  value={password}
-  onChangeText={setPassword}
-  password={true} // Automatically adds the eye-toggle logic!
-/>
+        <CustomInput
+          label="Password"
+          icon="lock"
+          placeholder="Enter your password"
+          value={password}
+          onChangeText={setPassword}
+          password={true} 
+        />
 
-      <PrimaryButton
-        title="Log In"
-        onPress={handleLogin}
-        isLoading={isLoading}
-      />
-      
-      {/* Navigation to Sign up */}
-      <TouchableOpacity 
-        style={styles.linkContainer} 
-        onPress={() => router.push('/(auth)/RoleSelectScreen')}
-      >
-        <Text style={styles.linkText}>Don't have an account? Sign up</Text>
-      </TouchableOpacity>
-    </View>
+        <PrimaryButton
+          title="Log In"
+          onPress={handleLogin}
+          isLoading={loading || isLoading}
+        />
+        
+        {/* Navigation to Sign up */}
+        <TouchableOpacity 
+          style={styles.linkContainer} 
+          onPress={() => router.push('/(auth)/RoleSelectScreen')}
+        >
+          <Text style={styles.linkText}>Don't have an account? Sign up</Text>
+        </TouchableOpacity>
+      </View>
     </ScreenWrapper>
   );
 }
@@ -92,15 +98,6 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     color: COLORS.text.secondary, 
     marginBottom: 32 
-  },
-  input: { 
-    backgroundColor: COLORS.surface, 
-    borderWidth: 1, 
-    borderColor: COLORS.border, 
-    borderRadius: 8, 
-    padding: 16, 
-    marginBottom: 16, 
-    fontSize: 16 
   },
   linkContainer: {
     marginTop: 24,

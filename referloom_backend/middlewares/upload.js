@@ -1,8 +1,8 @@
 // referloom_backend/middlewares/upload.js
-import multer from "multer";
-import { v2 as cloudinary } from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import dotenv from "dotenv";
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -13,20 +13,16 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// 2. Configure Storage Engine
+// 2. Configure Storage
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: "referloom", // Folder name in your Cloudinary dashboard
-    allowed_formats: ["jpeg", "jpg", "png", "pdf"],
-    resource_type: "auto", // Crucial for allowing PDFs to upload alongside images
+    folder: 'referloom_uploads', // The folder name in your Cloudinary account
+    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'], // Allow images and resumes/proofs
+    transformation: [{ width: 800, height: 800, crop: 'limit' }], // Compress large images
   },
 });
 
-// 3. Create Multer Instance
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
-});
+const upload = multer({ storage: storage });
 
 export default upload;

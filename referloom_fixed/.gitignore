@@ -1,43 +1,44 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# Dependencies
 node_modules/
+/referloom_backend/node_modules/
+/referloom_fixed/node_modules/
 
-# Expo
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Environment Variables
+.env
+!.env.example
+.env*.local
+
+# Expo & Metro
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+.metro-health-check*
 
-# Native
-.kotlin/
-*.orig.*
+# TypeScript
+*.tsbuildinfo
+
+# macOS/OS artifacts
+.DS_Store
+*.pem
+
+# Native App builds (Keep these only if you are using Expo Go exclusively)
+/ios
+/android
+
+# Secrets & Keys
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
 
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
-/ios
-/android
+# Misc
+app-example/
+coverage/
