@@ -24,6 +24,7 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          packager: npm   # <-- Add this line right here!
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: 4. Install Dependencies
