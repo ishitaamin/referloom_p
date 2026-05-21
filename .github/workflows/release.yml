@@ -24,7 +24,7 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
-          packager: npm   # <-- Add this line right here!
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: 4. Install Dependencies
@@ -46,7 +46,7 @@ jobs:
           APK_URL=$(eas build:view $BUILD_ID --json | jq -r '.artifacts.buildUrl')
           
           # 4. Download the file and name it ReferLoom.apk
-          wget $APK_URL -O ./ReferLoom.apk
+          wget "$APK_URL" -O ./ReferLoom.apk
 
       - name: 6. Create GitHub Release
         uses: softprops/action-gh-release@v2
