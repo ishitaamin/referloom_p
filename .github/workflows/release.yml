@@ -33,9 +33,20 @@ jobs:
 
       - name: 5. Build Android APK via EAS
         working-directory: ./referloom_fixed
-        # The --wait flag waits for Expo servers to finish building
-        # The --output flag downloads the finished file back to GitHub
-        run: eas build --platform android --profile production --non-interactive --wait --output ./ReferLoom.apk
+        env:
+          NODE_NO_WARNINGS: 1 # This hides the punycode warning so it doesn't break our JSON parser
+        run: |
+          # 1. Trigger the cloud build and wait for it to finish
+          eas build --platform android --profile production --non-interactive --wait
+          
+          # 2. Fetch the ID of the build that just finished
+          BUILD_ID=$(eas build:list --platform android --status finished --limit 1 --json --non-interactive | jq -r '.[0].id')
+          
+          # 3. Extract the exact download URL for that specific build
+          APK_URL=$(eas build:view $BUILD_ID --json | jq -r '.artifacts.buildUrl')
+          
+          # 4. Download the file and name it ReferLoom.apk
+          wget $APK_URL -O ./ReferLoom.apk
 
       - name: 6. Create GitHub Release
         uses: softprops/action-gh-release@v2
