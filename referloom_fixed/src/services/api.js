@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 
 // React Native handles localhost differently for Emulators
 // Use your computer's local IP address (e.g., 'http://192.168.1.X:5000/api') if testing on a real physical device!
-const BASE_URL = Platform.OS === 'android' ? 'http://192.168.1.8:5001/api' : 'http://localhost:5001/api';
+const BASE_URL = Platform.OS === 'android' ? 'https://referloom-api.onrender.com/api' : 'http://localhost:5001/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
