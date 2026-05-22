@@ -4,9 +4,8 @@ import cloudinary from "../config/cloudinary.js";
 import { generateCareerRoadmap, calculateProfileStrength } from "../utils/aiEngine.js";
 
 // 🔥 HELPER: Guarantees every user object sent to frontend has the real-time AI Score
-// 🔥 HELPER: Completely detaches from Mongoose to guarantee the AI Score is sent
-// 🔥 LOUD HELPER: Logs exactly what the backend is doing
-const attachAIToUser = (userDoc) => {
+// ✅ UPDATED: Now an async function to wait for Gemini
+const attachAIToUser = async (userDoc) => {
   console.log("🚨 [1] attachAIToUser function was triggered!"); 
   
   let userObj = userDoc.toObject ? userDoc.toObject() : JSON.parse(JSON.stringify(userDoc));
@@ -15,7 +14,8 @@ const attachAIToUser = (userDoc) => {
 
   if (userObj.role === 'student') {
     try {
-      const strengthData = calculateProfileStrength(userObj);
+      // ✅ UPDATED: Added await
+      const strengthData = await calculateProfileStrength(userObj);
       userObj.profileStrength = strengthData.score;
       userObj.profileSuggestions = strengthData.suggestions;
       
@@ -32,7 +32,7 @@ const attachAIToUser = (userDoc) => {
 
 // @desc    Get current logged in user profile
 export const getMyProfile = async (req, res) => {
-  console.log("📞 [API CALL] Frontend requested GET /users/profile"); // 👈 LOUD LOG
+  console.log("📞 [API CALL] Frontend requested GET /users/profile");
   try {
     const user = await User.findById(req.user.id).populate('projects');
     if (!user) {
@@ -40,14 +40,13 @@ export const getMyProfile = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
     
-    res.json(attachAIToUser(user)); 
+    // ✅ UPDATED: Added await
+    res.json(await attachAIToUser(user)); 
   } catch (error) {
     console.log("❌ [SERVER ERROR in getMyProfile]:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
-
-
 
 // @desc    Get user by ID
 export const getUserById = async (req, res) => {
@@ -60,7 +59,8 @@ export const getUserById = async (req, res) => {
     const user = await User.findById(id).select("-password").populate('projects'); 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json(attachAIToUser(user)); // 👈 Attached AI Score
+    // ✅ UPDATED: Added await
+    res.json(await attachAIToUser(user)); 
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -103,9 +103,10 @@ export const updateProfile = async (req, res) => {
 
     await user.save();
     
-    // 🔥 Must populate projects before calculating AI score for the response
     const populatedUser = await User.findById(user._id).populate('projects');
-    res.json({ message: "Profile updated successfully", user: attachAIToUser(populatedUser) });
+    
+    // ✅ UPDATED: Added await
+    res.json({ message: "Profile updated successfully", user: await attachAIToUser(populatedUser) });
   } catch (error) {
     console.error("Profile Update Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -123,15 +124,16 @@ export const updateCareerPreferences = async (req, res) => {
     // Save preferences
     user.studentDetails.careerPreferences = { fields, companies, locations, jobTypes, timeline };
 
-    // 🧠 Trigger the AI Engine
-    const roadmap = generateCareerRoadmap(user, req.body);
+    // 🧠 ✅ UPDATED: Trigger the AI Engine with await
+    const roadmap = await generateCareerRoadmap(user);
     user.studentDetails.aiCareerRoadmap = roadmap;
     
     await user.save();
 
-    // 🔥 Attach AI Score to the response
     const populatedUser = await User.findById(user._id).populate('projects');
-    res.status(200).json({ message: "Preferences saved and AI Roadmap generated!", user: attachAIToUser(populatedUser) });
+    
+    // ✅ UPDATED: Added await
+    res.status(200).json({ message: "Preferences saved and AI Roadmap generated!", user: await attachAIToUser(populatedUser) });
   } catch (error) {
     res.status(500).json({ message: "Failed to update preferences", error: error.message });
   }
@@ -146,7 +148,9 @@ export const resetCareerGoals = async (req, res) => {
     await user.save();
     
     const populatedUser = await User.findById(user._id).populate('projects');
-    res.json(attachAIToUser(populatedUser));
+    
+    // ✅ UPDATED: Added await
+    res.json(await attachAIToUser(populatedUser));
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -157,7 +161,9 @@ export const updateVisibility = async (req, res) => {
   try {
     const { visibilityMode } = req.body;
     const user = await User.findByIdAndUpdate(req.user.id, { visibilityMode }, { new: true }).populate('projects');
-    res.json({ message: `Profile is now ${visibilityMode}`, user: attachAIToUser(user) });
+    
+    // ✅ UPDATED: Added await
+    res.json({ message: `Profile is now ${visibilityMode}`, user: await attachAIToUser(user) });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

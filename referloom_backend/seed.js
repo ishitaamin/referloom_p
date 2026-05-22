@@ -45,23 +45,23 @@ const seedDatabase = async () => {
       role: "student",
       isVerified: true,
       isProfileComplete: true,
-      headline: "MERN Stack Developer | React Native Enthusiast",
-      bio: "I love building scalable web applications and have hands-on experience with frontend and backend technologies.",
+      headline: "Senior MERN Stack Developer | React Native Specialist",
+      bio: "I build highly scalable web and mobile applications. Deep expertise in frontend performance, backend architecture, and database management.",
       visibilityMode: "public",
       studentDetails: {
         university: "Navrachana University",
         course: "B.Tech Computer Science",
         semester: "6th",
-        skills: ["React", "Node.js", "Express", "MongoDB", "JavaScript", "Tailwind CSS"],
+        skills: ["React", "Node.js", "Express", "MongoDB", "JavaScript", "Tailwind CSS", "React Native", "API Development"],
         experience: [{
           company: "TechNova Solutions",
-          role: "Frontend Intern",
+          role: "Full Stack Intern",
           startDate: "Jun 2023",
           endDate: "Aug 2023",
-          description: "Built responsive dashboards using React and Tailwind CSS."
+          description: "Built responsive dashboards using React and Tailwind CSS. Designed robust REST APIs using Node.js and Express."
         }],
         careerPreferences: {
-          fields: ["Full Stack (MERN)"],
+          fields: ["Full Stack (MERN)", "Mobile Development"],
           jobTypes: ["Summer Internship", "Full-Time Role"],
           timeline: ["Immediately"]
         },
@@ -169,7 +169,7 @@ const seedDatabase = async () => {
     });
 
     const proj3 = new Project({
-      student: savedStudents[2]._id, // Rohan (Added to boost his score)
+      student: savedStudents[2]._id, // Rohan
       title: "Personal Portfolio UI",
       description: "A highly interactive and responsive portfolio built using React and modern CSS animations.",
       tags: ["React", "CSS", "HTML", "Framer Motion"],
@@ -178,7 +178,6 @@ const seedDatabase = async () => {
 
     const savedProjects = await Project.insertMany([proj1, proj2, proj3]);
 
-    // Link projects back to students
     savedStudents[0].projects.push(savedProjects[0]._id);
     savedStudents[1].projects.push(savedProjects[1]._id);
     savedStudents[2].projects.push(savedProjects[2]._id);
@@ -279,7 +278,6 @@ const seedDatabase = async () => {
     console.log("💼 Seeding Jobs...");
 
     const jobsToInsert = [
-      // Job 1: Perfect match for Aarav (95%+)
       {
         postedBy: savedProfessionals[2]._id, // TechNova
         title: "MERN Stack Intern",
@@ -291,7 +289,6 @@ const seedDatabase = async () => {
         salaryRange: "₹20,000/month",
         status: "open"
       },
-      // Job 2: Another strong match for Aarav (85%+)
       {
         postedBy: savedProfessionals[2]._id, // TechNova
         title: "React Web Developer",
@@ -303,7 +300,6 @@ const seedDatabase = async () => {
         salaryRange: "₹8L - ₹12L",
         status: "open"
       },
-      // Job 3: Perfect match for Rohan (85%+)
       {
         postedBy: savedProfessionals[0]._id, // Google Alumni
         title: "Frontend Engineering Intern",
@@ -315,7 +311,6 @@ const seedDatabase = async () => {
         salaryRange: "₹60,000/month",
         status: "open"
       },
-      // Job 4: The Data Science role (Low score for Aarav, tests Missing Skills for Priya)
       {
         postedBy: savedProfessionals[3]._id, // DataSphere
         title: "Data Science Intern",
@@ -327,7 +322,6 @@ const seedDatabase = async () => {
         salaryRange: "₹30,000/month",
         status: "open"
       },
-      // Job 5: Senior Role (Tests the "No Experience" penalty)
       {
         postedBy: savedProfessionals[0]._id, // Vikram
         title: "Senior System Architect",
@@ -337,6 +331,30 @@ const seedDatabase = async () => {
         jobType: "Full-Time Role",
         location: "Remote (Global)",
         salaryRange: "₹40L - ₹60L",
+        status: "open"
+      },
+      // --- NEW: Guaranteed match for Aarav (95%+) ---
+      {
+        postedBy: savedProfessionals[2]._id, // TechNova
+        title: "Junior MERN Stack Engineer",
+        companyName: "TechNova Solutions",
+        description: "We are strictly looking for a MERN stack developer with hands-on experience building E-Commerce platforms. Must know how to connect React to Node.js and MongoDB.",
+        requirements: ["React", "Node.js", "Express", "MongoDB", "Tailwind CSS", "JavaScript"],
+        jobType: "Full-Time Role",
+        location: "Remote",
+        salaryRange: "₹6L - ₹10L",
+        status: "open"
+      },
+      // --- NEW: Guaranteed Mobile match for Aarav (90%+) ---
+      {
+        postedBy: savedProfessionals[0]._id, // Google Alumni
+        title: "React Native Mobile Developer",
+        companyName: "Google",
+        description: "Looking for a mobile developer to build cross-platform apps using React Native. Experience with API Development and JavaScript is required.",
+        requirements: ["React Native", "JavaScript", "API Development"],
+        jobType: "Summer Internship",
+        location: "Remote",
+        salaryRange: "₹45,000/month",
         status: "open"
       }
     ];
@@ -348,33 +366,117 @@ const seedDatabase = async () => {
     // ==========================================
     console.log("🤝 Seeding Mentorships and Applications...");
 
-    // Aarav requests mentorship from Vikram
+    // --- ORIGINAL MENTORSHIP REQUESTS ---
     await Mentorship.create({
-      student: savedStudents[0]._id,
-      alumni: savedProfessionals[0]._id,
+      student: savedStudents[0]._id, // Aarav
+      alumni: savedProfessionals[0]._id, // Vikram
       message: "Hi Vikram, I am highly interested in backend architecture at scale. Would love your guidance on my current MERN project.",
       status: "pending"
     });
 
-    // Rohan requests mentorship from Anjali
     await Mentorship.create({
-      student: savedStudents[2]._id,
-      alumni: savedProfessionals[1]._id,
+      student: savedStudents[2]._id, // Rohan
+      alumni: savedProfessionals[1]._id, // Anjali
       message: "Hi Anjali, I love your work at Amazon! Could you review my React portfolio?",
       status: "pending"
     });
 
-    // Aarav applies to the MERN Intern job
+    // --- NEW MENTORSHIP DATA ---
+    await Mentorship.create([
+      // Populates Aarav's active mentorship hub
+      {
+        student: savedStudents[0]._id, // Aarav
+        alumni: savedProfessionals[1]._id, // Anjali
+        message: "Hi Anjali, thanks for accepting my request! I'd love to learn about React performance.",
+        status: "accepted" 
+      },
+      // Gives Vikram a second pending request
+      {
+        student: savedStudents[1]._id, // Priya
+        alumni: savedProfessionals[0]._id, // Vikram
+        message: "Hi Vikram, looking for guidance on transitioning into Data Science. Do you have time?",
+        status: "pending" 
+      },
+      // Gives Vikram a completed/rejected request history
+      {
+        student: savedStudents[3]._id, // Neha
+        alumni: savedProfessionals[0]._id, // Vikram
+        message: "Hello Vikram, can you refer me to Google?",
+        status: "rejected"
+      }
+    ]);
+
+    // --- ORIGINAL APPLICATION ---
     await Application.create({
-      job: savedJobs[0]._id,
-      student: savedStudents[0]._id, 
+      job: savedJobs[0]._id, // MERN Intern
+      student: savedStudents[0]._id, // Aarav
       fitScore: 98,                  
       status: "applied",
       resumeLink: "https://test.com/aarav-resume.pdf",
       coverLetter: "I have built a fully functional MERN e-commerce app and would love to bring my skills to TechNova."
     });
 
-    console.log("🎉 DATABASE SEEDED COMPLETELY! 🎉");
+    // --- NEW ATS PIPELINE, OFFERS & REFERRAL DATA ---
+    await Application.create([
+      // 1. Aarav gets an OFFER (Populates Aarav's Offer Screen)
+      {
+        job: savedJobs[1]._id, // React Web Developer @ TechNova
+        student: savedStudents[0]._id, // Aarav
+        fitScore: 88,
+        status: "offered", 
+        resumeLink: "https://test.com/aarav-resume.pdf",
+        coverLetter: "Excited to bring my React skills to your dashboard team."
+      },
+      // 2. Aarav is INTERVIEWING (Populates Aarav's Pipeline)
+      {
+        job: savedJobs[2]._id, // Frontend Intern @ Google
+        student: savedStudents[0]._id, // Aarav
+        fitScore: 85,
+        status: "interviewing",
+        resumeLink: "https://test.com/aarav-resume.pdf",
+        coverLetter: "Google is my dream company, I have prepped heavily for this."
+      },
+      // ⭐ 3. NEW: Aarav gets an ALUMNI REFERRAL (Populates the Referral Card!) ⭐
+      {
+        job: savedJobs[4]._id, // Senior System Architect @ Google
+        student: savedStudents[0]._id, // Aarav
+        fitScore: 92,
+        status: "shortlisted",
+        isReferral: true, // This flag triggers your frontend referral UI
+        referredBy: savedProfessionals[0]._id, // Vikram Singh (Google Alumni)
+        resumeLink: "https://test.com/aarav-resume.pdf",
+        coverLetter: "Referred internally by Vikram Singh after completing our backend architecture mentorship session."
+      },
+      // 4. Priya gets REJECTED (Populates TechNova's ATS Pipeline)
+      {
+        job: savedJobs[0]._id, // MERN Intern @ TechNova
+        student: savedStudents[1]._id, // Priya
+        fitScore: 45, 
+        status: "rejected",
+        resumeLink: "https://test.com/priya-resume.pdf",
+        coverLetter: "I am trying to pivot into MERN stack from Data Science."
+      },
+      // 5. Rohan is SHORTLISTED (Populates TechNova's ATS Pipeline)
+      {
+        job: savedJobs[0]._id, // MERN Intern @ TechNova
+        student: savedStudents[2]._id, // Rohan
+        fitScore: 82, 
+        status: "shortlisted",
+        resumeLink: "https://test.com/rohan-resume.pdf",
+        coverLetter: "I am a frontend specialist, but I can pick up Node fast."
+      },
+      // 6. Neha just APPLIED (Populates TechNova's ATS Pipeline)
+      {
+        job: savedJobs[1]._id, // React Web Dev @ TechNova
+        student: savedStudents[3]._id, // Neha 
+        fitScore: 20, 
+        status: "applied",
+        resumeLink: "https://test.com/neha-resume.pdf",
+        coverLetter: "Looking for my first opportunity!"
+      }
+    ]);
+
+    console.log("🎉 DATABASE SEEDED COMPLETELY WITH NEW MOCK DATA! 🎉");
     process.exit(0);
 
   } catch (error) {
